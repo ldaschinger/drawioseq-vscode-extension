@@ -1,0 +1,67 @@
+{
+  "name": "drawioseq",
+  "displayName": "drawioseq",
+  "publisher": "dluk",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ldaschinger/drawio-seqgen-vs-code-extension"
+  },
+  "description": "Generate draw.io diagrams from .seq files on save",
+  "version": "0.0.12",
+  "engines": {
+    "vscode": "^1.85.2"
+  },
+  "categories": [
+    "Other"
+  ],
+"activationEvents": [
+    "onLanguage:seq",
+    "workspaceContains:**/*.seq"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "seq",
+        "aliases": ["Sequence Diagram", "seq"],
+        "extensions": [".seq"]
+      }
+    ],
+    "grammars": [
+      {
+        "language": "seq",
+        "scopeName": "source.seq",
+        "path": "./syntaxes/seq.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "drawioseq.generate",
+        "title": "drawioseq: Generate .drawio from current .seq file"
+      },
+      {
+        "command": "drawioseq.preview",
+        "title": "drawioseq: Open Preview to the Side"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.56.1",
+    "eslint": "^9.39.3",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}

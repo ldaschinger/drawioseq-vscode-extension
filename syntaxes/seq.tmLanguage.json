@@ -1,0 +1,126 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Sequence Diagram",
+  "scopeName": "source.seq",
+  "fileTypes": ["seq"],
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#block-keywords" },
+    { "include": "#declaration-keywords" },
+    { "include": "#arrow-message" },
+    { "include": "#self-call" },
+    { "include": "#quoted-string" },
+    { "include": "#number" }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.seq",
+      "match": "//.*$"
+    },
+
+    "block-keywords": {
+      "patterns": [
+        {
+          "comment": "block openers with optional label",
+          "match": "^\\s*(opt|loop|break|critical|alt|par|group|else|and|section)\\b(.*)?$",
+          "captures": {
+            "1": { "name": "keyword.control.seq" },
+            "2": { "name": "string.unquoted.label.seq" }
+          }
+        },
+        {
+          "comment": "block closer",
+          "match": "^\\s*(end)\\s*$",
+          "captures": {
+            "1": { "name": "keyword.control.seq" }
+          }
+        }
+      ]
+    },
+
+    "declaration-keywords": {
+      "patterns": [
+        {
+          "comment": "title: <text>",
+          "match": "^\\s*(title)(\\s+(?:width|height)\\s+[0-9]+)*\\s*:\\s*(.+)$",
+          "captures": {
+            "1": { "name": "keyword.other.seq" },
+            "3": { "name": "entity.name.section.seq" }
+          }
+        },
+        {
+          "comment": "participant NAME [width N] [spacing N] [: text]",
+          "match": "^\\s*(participant)\\s+([A-Za-z0-9_]+)((?:\\s+(?:width|spacing)\\s+[0-9]+)*)(\\s*:\\s*(.+))?$",
+          "captures": {
+            "1": { "name": "keyword.other.seq" },
+            "2": { "name": "entity.name.type.seq" },
+            "3": { "name": "constant.numeric.seq" },
+            "5": { "name": "string.unquoted.label.seq" }
+          }
+        },
+        {
+          "comment": "activate / deactivate",
+          "match": "^\\s*(activate|deactivate)(\\s+[A-Za-z0-9_]+)+$",
+          "captures": {
+            "1": { "name": "keyword.other.seq" }
+          }
+        },
+        {
+          "comment": "note on NAME [...]: text",
+          "match": "^\\s*(note on)\\s+([A-Za-z0-9_]+)((?:\\s+(?:dx|dy|width|height)\\s+-?[0-9]+)*)\\s*:\\s*(.+)$",
+          "captures": {
+            "1": { "name": "keyword.other.seq" },
+            "2": { "name": "entity.name.type.seq" },
+            "3": { "name": "constant.numeric.seq" },
+            "4": { "name": "string.unquoted.label.seq" }
+          }
+        },
+        {
+          "comment": "found / lost messages",
+          "match": "^\\s*(found|lost)\\b",
+          "captures": {
+            "1": { "name": "keyword.other.seq" }
+          }
+        },
+        {
+          "comment": "vertical offset / extend frame",
+          "match": "^\\s*(vertical offset|extend frame)\\s+(-?[0-9]+)$",
+          "captures": {
+            "1": { "name": "keyword.other.seq" },
+            "2": { "name": "constant.numeric.seq" }
+          }
+        }
+      ]
+    },
+
+    "arrow-message": {
+      "comment": "SenderNAME -->> ReceiverNAME : label",
+      "match": "^\\s*([A-Za-z0-9_]+)\\s+(--?>?>?[+\\-|]?)\\s+([A-Za-z0-9_]+)(\\s*:\\s*(.+))?$",
+      "captures": {
+        "1": { "name": "entity.name.type.seq" },
+        "2": { "name": "keyword.operator.arrow.seq" },
+        "3": { "name": "entity.name.type.seq" },
+        "5": { "name": "string.unquoted.label.seq" }
+      }
+    },
+
+    "self-call": {
+      "comment": "NAME : label  (self-call, no arrow)",
+      "match": "^\\s*([A-Za-z0-9_]+)\\s*:\\s*(.+)$",
+      "captures": {
+        "1": { "name": "entity.name.type.seq" },
+        "2": { "name": "string.unquoted.label.seq" }
+      }
+    },
+
+    "quoted-string": {
+      "name": "string.quoted.double.seq",
+      "match": "\"[^\"\\n]*\""
+    },
+
+    "number": {
+      "name": "constant.numeric.seq",
+      "match": "\\b-?[0-9]+\\b"
+    }
+  }
+}

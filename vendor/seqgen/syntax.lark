@@ -1,0 +1,83 @@
+start: statement_list
+
+statement_list: statement*
+
+statement: title_width
+         | title_height
+         | title
+         | participant_width
+         | participant_spacing
+         | participant
+         | activate
+         | deactivate
+         | option
+         | loop
+         | break_
+         | critical
+         | alternative
+         | parallel
+         | group
+         | vertical_offset
+         | extend_frame
+         | note
+         | found_message
+         | lost_message
+         | message
+         | self_call
+
+title: "title" (title_width | title_height)* _SPACE* ":" _SPACE+ TEXT _NEWLINE
+title_width: _SPACE+ "width" _SPACE+ NUMBER
+title_height: _SPACE+ "height" _SPACE+ NUMBER
+
+participant: "participant" _SPACE+ NAME (participant_width | participant_spacing)* (_SPACE* ":" _SPACE+ TEXT)? _NEWLINE
+participant_width: _SPACE+ "width" _SPACE+ NUMBER
+participant_spacing: _SPACE+ "spacing" _SPACE+ NUMBER
+
+activate: "activate" (_SPACE+ NAME)+ _NEWLINE
+deactivate: "deactivate" (_SPACE+ NAME)+ _NEWLINE
+
+option: "opt" (_SPACE+ TEXT)? _NEWLINE statement_list "end" _NEWLINE
+loop: "loop" (_SPACE+ TEXT)? _NEWLINE statement_list "end" _NEWLINE
+break_: "break" (_SPACE+ TEXT)? _NEWLINE statement_list "end" _NEWLINE
+critical: "critical" (_SPACE+ TEXT)? _NEWLINE statement_list "end" _NEWLINE
+alternative: "alt" (_SPACE+ TEXT)? _NEWLINE statement_list alternative_section* "end" _NEWLINE
+alternative_section: "else" (_SPACE+ TEXT)? _NEWLINE statement_list
+parallel: "par" (_SPACE+ TEXT)? _NEWLINE statement_list parallel_section* "end" _NEWLINE
+parallel_section: "and" (_SPACE+ TEXT)? _NEWLINE statement_list
+group: "group" _SPACE+ QUOTED_TEXT (_SPACE+ TEXT)? _NEWLINE statement_list group_section* "end" _NEWLINE
+group_section: "section" (_SPACE+ TEXT)? _NEWLINE statement_list
+
+note: "note on" _SPACE+ NAME (note_dx | note_dy | note_width | note_height)* _SPACE* ":" _SPACE+ TEXT _NEWLINE
+note_dx: _SPACE+ "dx" _SPACE+ NUMBER
+note_dy: _SPACE+ "dy" _SPACE+ NUMBER
+note_width: _SPACE+ "width" _SPACE+ NUMBER
+note_height: _SPACE+ "height" _SPACE+ NUMBER
+
+found_message: "found" _SPACE+ DIRECTION (_SPACE+ NUMBER)? _SPACE+ arrow _SPACE+ NAME (_SPACE* ":" _SPACE+ TEXT)? _NEWLINE
+lost_message: NAME _SPACE+ arrow _SPACE+ "lost" _SPACE+ DIRECTION (_SPACE+ NUMBER)? (_SPACE* ":" _SPACE+ TEXT)? _NEWLINE
+message: NAME _SPACE+ arrow _SPACE+ NAME (_SPACE* ":" _SPACE+ TEXT)? _NEWLINE
+self_call: NAME _SPACE* ":" _SPACE+ TEXT _NEWLINE
+DIRECTION: /left|right/
+
+vertical_offset: "vertical offset" _SPACE+ NUMBER _NEWLINE
+extend_frame: "extend frame" _SPACE+ NUMBER _NEWLINE
+
+arrow: ARROW_LINE ARROW_END ARROW_ACTIVATION?
+ARROW_LINE: /-{1,2}/
+ARROW_END: />{1,2}/
+ARROW_ACTIVATION: /\+|-|\|/
+
+QUOTED_TEXT: /"[^\n]*?[^\\]"/
+TEXT: /[^\n]+/
+NAME: /[A-Za-z0-9_]+/
+NUMBER: /-?[0-9]+/
+
+_SPACE: /[ \t]+/
+_NEWLINE: "\n"
+_BEGIN: /^/m
+_END: /$/m
+
+%ignore _BEGIN _SPACE* /\/\/.*/ _NEWLINE // comments
+%ignore _BEGIN _SPACE* _NEWLINE // empty lines
+%ignore _BEGIN _SPACE+ // leading white space
+%ignore _SPACE+ _END // trailing white space

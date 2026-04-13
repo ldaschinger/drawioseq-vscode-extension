@@ -1,0 +1,10 @@
+out
+dist
+node_modules
+.vscode-test/
+*.vsix
+**/__pycache__/
+*.pyc
+.DS_Store
+.claude/
+.vscode/
