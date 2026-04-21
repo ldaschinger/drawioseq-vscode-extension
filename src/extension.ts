@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 
 let statusBarItem: vscode.StatusBarItem;
 let diagnosticCollection: vscode.DiagnosticCollection;       // syntax + semantic hints
@@ -80,6 +81,102 @@ export function activate(context: vscode.ExtensionContext) {
 function isSeqDoc(doc: vscode.TextDocument): boolean {
     return (doc.languageId === 'seq' || doc.fileName.endsWith('.seq'))
         && doc.uri.scheme === 'file';  // ignore untitled:, vscode-remote:, etc.
+}
+
+// ─── Old-syntax converter ────────────────────────────────────────────────────
+
+/**
+ * Converts pre-2026 .seq syntax to the current syntax so the Python backend
+ * can parse both old and new files transparently.
+ *
+ * Conversions applied:
+ *   title "text" [width N height N]  →  title [width N height N]: text
+ *   participant "Display" as ALIAS   →  participant ALIAS: Display
+ *   participant Name as ALIAS        →  participant ALIAS: Name
+ *   note on NAME [attrs]\n…\nend note  →  note on NAME [attrs]: …
+ *   frame extend N                   →  extend frame N
+ *   block keyword "quoted label"     →  block keyword unquoted label
+ *   \n in labels                     →  <br/>
+ */
+function convertOldSyntax(text: string): string {
+    const lines = text.split('\n');
+    const out: string[] = [];
+    let i = 0;
+    while (i < lines.length) {
+        const line = lines[i];
+        const indent = line.match(/^(\s*)/)?.[1] ?? '';
+        const trimmed = line.trim();
+
+        // title "text" [width N height N]
+        let m = trimmed.match(/^title\s+"((?:[^"\\]|\\.)*)"\s*((?:(?:width|height)\s+[0-9]+\s*)*)$/);
+        if (m) {
+            const titleText = m[1].replace(/\\n/g, '<br/>');
+            const attrs = m[2].trim();
+            out.push(indent + (attrs ? `title ${attrs}: ${titleText}` : `title: ${titleText}`));
+            i++; continue;
+        }
+
+        // participant "Display" [width/spacing N]* [as ALIAS]
+        m = trimmed.match(/^participant\s+"((?:[^"\\]|\\.)*)"\s*((?:(?:width|spacing)\s+[0-9]+\s*)*)(?:as\s+([A-Za-z0-9_]+))?$/);
+        if (m) {
+            const display = m[1].replace(/\\n/g, '<br/>');
+            const attrs = m[2].trim();
+            const alias = m[3];
+            if (alias) {
+                out.push(indent + (attrs ? `participant ${alias} ${attrs}: ${display}` : `participant ${alias}: ${display}`));
+            } else {
+                out.push(line); // quoted-only form is still valid in new syntax
+            }
+            i++; continue;
+        }
+
+        // participant Name [width/spacing N]* as ALIAS
+        m = trimmed.match(/^participant\s+([A-Za-z0-9_]+)((?:\s+(?:width|spacing)\s+[0-9]+)*)\s+as\s+([A-Za-z0-9_]+)$/);
+        if (m) {
+            const name = m[1];
+            const attrs = m[2].trim();
+            const alias = m[3];
+            out.push(indent + (attrs ? `participant ${alias} ${attrs}: ${name}` : `participant ${alias}: ${name}`));
+            i++; continue;
+        }
+
+        // note on NAME [attrs]   (block form — no trailing colon)
+        m = trimmed.match(/^(note on\s+[A-Za-z0-9_]+(?:\s+(?:dx|dy|width|height)\s+-?[0-9]+)*)$/);
+        if (m) {
+            const noteDecl = m[1];
+            const bodyLines: string[] = [];
+            i++;
+            while (i < lines.length && lines[i].trim() !== 'end note') {
+                const bt = lines[i].trim();
+                if (bt) { bodyLines.push(bt); }
+                i++;
+            }
+            if (i < lines.length) { i++; } // skip "end note"
+            const noteText = bodyLines.join('<br/>').replace(/\\n/g, '<br/>');
+            out.push(indent + `${noteDecl}: ${noteText}`);
+            continue;
+        }
+
+        // frame extend N  →  extend frame N
+        m = trimmed.match(/^frame extend\s+(-?[0-9]+)$/);
+        if (m) {
+            out.push(indent + `extend frame ${m[1]}`);
+            i++; continue;
+        }
+
+        // block keyword "quoted label"  →  keyword unquoted label
+        m = trimmed.match(/^(opt|loop|break|alt|par|group|else|and|section)\s+"((?:[^"\\]|\\.)*)"(.*)$/);
+        if (m) {
+            const label = m[2].replace(/\\"/g, '"').replace(/\\n/g, '<br/>');
+            out.push(indent + `${m[1]} ${label}${m[3]}`);
+            i++; continue;
+        }
+
+        // \n in message labels
+        out.push(line.replace(/\\n/g, '<br/>'));
+        i++;
+    }
+    return out.join('\n');
 }
 
 // ─── Security helpers ────────────────────────────────────────────────────────
@@ -240,7 +337,7 @@ async function validateDocument(doc: vscode.TextDocument, extensionPath: string)
         }
     );
 
-    child.stdin?.end(text, 'utf8');
+    child.stdin?.end(convertOldSyntax(text), 'utf8');
 }
 
 function runSemanticChecks(doc: vscode.TextDocument): vscode.Diagnostic[] {
@@ -256,7 +353,15 @@ function runSemanticChecks(doc: vscode.TextDocument): vscode.Diagnostic[] {
         const trimmed = raw.replace(/\/\/.*$/, '').trim();
         if (!trimmed) { continue; }
 
-        const participantM = trimmed.match(/^participant\s+([A-Za-z0-9_]+)/);
+        // new syntax: participant ALIAS [attrs] [: display]
+        let participantM = trimmed.match(/^participant\s+([A-Za-z0-9_]+)((?:\s+(?:width|spacing)\s+[0-9]+)*)(?:\s+as\s+[A-Za-z0-9_]+)?/);
+        // old syntax: participant "Display" [attrs] [as ALIAS]
+        if (!participantM) {
+            const oldQ = trimmed.match(/^participant\s+"[^"]*"(?:\s+(?:width|spacing)\s+[0-9]+)*(?:\s+as\s+([A-Za-z0-9_]+))?/);
+            if (oldQ) { if (oldQ[1]) { declaredParticipants.add(oldQ[1]); } continue; }
+            const oldA = trimmed.match(/^participant\s+[A-Za-z0-9_]+(?:\s+(?:width|spacing)\s+[0-9]+)*\s+as\s+([A-Za-z0-9_]+)/);
+            if (oldA) { declaredParticipants.add(oldA[1]); continue; }
+        }
         if (participantM) { declaredParticipants.add(participantM[1]); continue; }
 
         const activateM = trimmed.match(/^activate\s+(.*)/);
@@ -278,11 +383,13 @@ function runSemanticChecks(doc: vscode.TextDocument): vscode.Diagnostic[] {
         const firstWord = trimmed.split(/\s/)[0];
         if (BLOCK_OPENERS.has(firstWord)) { blockStack.push({ keyword: firstWord, line: i }); continue; }
 
-        if (/^end\s*$/.test(trimmed)) {
-            if (blockStack.length === 0) {
-                diags.push(makeHint(i, 0, 3, 'Unexpected "end" — no open block'));
-            } else {
-                blockStack.pop();
+        if (/^end(\s+note)?\s*$/.test(trimmed)) {
+            if (trimmed === 'end') {
+                if (blockStack.length === 0) {
+                    diags.push(makeHint(i, 0, 3, 'Unexpected "end" — no open block'));
+                } else {
+                    blockStack.pop();
+                }
             }
             continue;
         }
@@ -354,13 +461,28 @@ async function generateAndPreview(seqFilePath: string, extensionPath: string, fo
     statusBarItem.text = '$(sync~spin) drawioseq: generating...';
     statusBarItem.show();
 
+    // Convert old syntax on-the-fly: write to a temp file so main.py always
+    // receives new-syntax content while the output still lands next to the source.
+    let inputForPython = seqFilePath;
+    let tempSeqPath: string | null = null;
+    try {
+        const originalText = fs.readFileSync(seqFilePath, 'utf8');
+        const convertedText = convertOldSyntax(originalText);
+        if (convertedText !== originalText) {
+            tempSeqPath = path.join(os.tmpdir(), `drawioseq_${Date.now()}.seq`);
+            fs.writeFileSync(tempSeqPath, convertedText, 'utf8');
+            inputForPython = tempSeqPath;
+        }
+    } catch { /* fall through: use original file */ }
+
     // Use execFile (not exec) — arguments are never passed through a shell,
     // so there is no shell injection risk even with unusual file names.
     cp.execFile(
         python,
-        [mainScript, seqFilePath, '-o', outputPath],
+        [mainScript, inputForPython, '-o', outputPath],
         { cwd: vendorDir, timeout: SUBPROCESS_TIMEOUT_MS },
         async (err, _stdout, stderr) => {
+            if (tempSeqPath) { try { fs.unlinkSync(tempSeqPath); } catch { /* ignore */ } }
             statusBarItem.hide();
 
             if (err) {

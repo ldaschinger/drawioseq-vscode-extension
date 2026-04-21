@@ -31,8 +31,8 @@
           }
         },
         {
-          "comment": "block closer",
-          "match": "^\\s*(end)\\s*$",
+          "comment": "block closer: end / end note",
+          "match": "^\\s*(end note|end)\\s*$",
           "captures": {
             "1": { "name": "keyword.control.seq" }
           }
@@ -43,7 +43,7 @@
     "declaration-keywords": {
       "patterns": [
         {
-          "comment": "title: <text>",
+          "comment": "title: <text> [width N] [height N] (new syntax)",
           "match": "^\\s*(title)(\\s+(?:width|height)\\s+[0-9]+)*\\s*:\\s*(.+)$",
           "captures": {
             "1": { "name": "keyword.other.seq" },
@@ -51,13 +51,44 @@
           }
         },
         {
-          "comment": "participant NAME [width N] [spacing N] [: text]",
+          "comment": "title \"text\" [width N] [height N] (old syntax)",
+          "match": "^\\s*(title)\\s+(\"[^\"]*\")((?:\\s+(?:width|height)\\s+[0-9]+)*)$",
+          "captures": {
+            "1": { "name": "keyword.other.seq" },
+            "2": { "name": "entity.name.section.seq" },
+            "3": { "name": "constant.numeric.seq" }
+          }
+        },
+        {
+          "comment": "participant NAME [width N] [spacing N] [: text] (new syntax)",
           "match": "^\\s*(participant)\\s+([A-Za-z0-9_]+)((?:\\s+(?:width|spacing)\\s+[0-9]+)*)(\\s*:\\s*(.+))?$",
           "captures": {
             "1": { "name": "keyword.other.seq" },
             "2": { "name": "entity.name.type.seq" },
             "3": { "name": "constant.numeric.seq" },
             "5": { "name": "string.unquoted.label.seq" }
+          }
+        },
+        {
+          "comment": "participant \"Display Name\" [as ALIAS] (old syntax, quoted name)",
+          "match": "^\\s*(participant)\\s+(\"[^\"]*\")((?:\\s+(?:width|spacing)\\s+[0-9]+)*)(\\s+as\\s+([A-Za-z0-9_]+))?$",
+          "captures": {
+            "1": { "name": "keyword.other.seq" },
+            "2": { "name": "string.unquoted.label.seq" },
+            "3": { "name": "constant.numeric.seq" },
+            "4": { "name": "keyword.other.seq" },
+            "5": { "name": "entity.name.type.seq" }
+          }
+        },
+        {
+          "comment": "participant NAME as ALIAS [spacing N] (old syntax, unquoted name with alias)",
+          "match": "^\\s*(participant)\\s+([A-Za-z0-9_]+)((?:\\s+(?:width|spacing)\\s+[0-9]+)*)\\s+(as)\\s+([A-Za-z0-9_]+)$",
+          "captures": {
+            "1": { "name": "keyword.other.seq" },
+            "2": { "name": "string.unquoted.label.seq" },
+            "3": { "name": "constant.numeric.seq" },
+            "4": { "name": "keyword.other.seq" },
+            "5": { "name": "entity.name.type.seq" }
           }
         },
         {
@@ -68,7 +99,7 @@
           }
         },
         {
-          "comment": "note on NAME [...]: text",
+          "comment": "note on NAME [...]: text (new syntax, inline)",
           "match": "^\\s*(note on)\\s+([A-Za-z0-9_]+)((?:\\s+(?:dx|dy|width|height)\\s+-?[0-9]+)*)\\s*:\\s*(.+)$",
           "captures": {
             "1": { "name": "keyword.other.seq" },
@@ -78,8 +109,25 @@
           }
         },
         {
-          "comment": "vertical offset / extend frame",
-          "match": "^\\s*(vertical offset|extend frame)\\s+(-?[0-9]+)$",
+          "comment": "note on NAME [...] (old syntax, block form — no colon)",
+          "match": "^\\s*(note on)\\s+([A-Za-z0-9_]+)((?:\\s+(?:dx|dy|width|height)\\s+-?[0-9]+)*)$",
+          "captures": {
+            "1": { "name": "keyword.other.seq" },
+            "2": { "name": "entity.name.type.seq" },
+            "3": { "name": "constant.numeric.seq" }
+          }
+        },
+        {
+          "comment": "extend frame / frame extend (new and old syntax)",
+          "match": "^\\s*(extend frame|frame extend)\\s+(-?[0-9]+)$",
+          "captures": {
+            "1": { "name": "keyword.other.seq" },
+            "2": { "name": "constant.numeric.seq" }
+          }
+        },
+        {
+          "comment": "vertical offset",
+          "match": "^\\s*(vertical offset)\\s+(-?[0-9]+)$",
           "captures": {
             "1": { "name": "keyword.other.seq" },
             "2": { "name": "constant.numeric.seq" }
@@ -115,7 +163,7 @@
     },
 
     "arrow-message": {
-      "comment": "SenderNAME -->> ReceiverNAME : label",
+      "comment": "SenderNAME -->> ReceiverNAME [: label]",
       "match": "^\\s*([A-Za-z0-9_]+)\\s+(--?>?>?[+\\-|]?)\\s+([A-Za-z0-9_]+)(\\s*:\\s*(.+))?$",
       "captures": {
         "1": { "name": "entity.name.type.seq" },
