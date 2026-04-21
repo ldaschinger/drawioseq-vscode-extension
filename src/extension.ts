@@ -8,6 +8,8 @@ let statusBarItem: vscode.StatusBarItem;
 let diagnosticCollection: vscode.DiagnosticCollection;       // syntax + semantic hints
 let generationDiagnostics: vscode.DiagnosticCollection;      // generation failure warnings
 let debounceTimer: NodeJS.Timeout | undefined;
+// Track which documents have already been offered a conversion so we don't spam
+const conversionOffered = new Set<string>();
 
 export function activate(context: vscode.ExtensionContext) {
     statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -19,14 +21,20 @@ export function activate(context: vscode.ExtensionContext) {
     generationDiagnostics = vscode.languages.createDiagnosticCollection('seq-generation');
     context.subscriptions.push(generationDiagnostics);
 
-    // Validate already-open documents
+    // Validate already-open documents and offer conversion for old syntax
     vscode.workspace.textDocuments.forEach(doc => {
-        if (isSeqDoc(doc)) { validateDocument(doc, context.extensionPath); }
+        if (isSeqDoc(doc)) {
+            validateDocument(doc, context.extensionPath);
+            offerConversion(doc);
+        }
     });
 
     context.subscriptions.push(
         vscode.workspace.onDidOpenTextDocument(doc => {
-            if (isSeqDoc(doc)) { validateDocument(doc, context.extensionPath); }
+            if (isSeqDoc(doc)) {
+                validateDocument(doc, context.extensionPath);
+                offerConversion(doc);
+            }
         })
     );
 
@@ -44,6 +52,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidCloseTextDocument(doc => {
             diagnosticCollection.delete(doc.uri);
             generationDiagnostics.delete(doc.uri);
+            conversionOffered.delete(doc.uri.toString());
         })
     );
 
@@ -177,6 +186,48 @@ function convertOldSyntax(text: string): string {
         i++;
     }
     return out.join('\n');
+}
+
+/** Returns true if the text contains at least one old-syntax construct. */
+function isOldSyntax(text: string): boolean {
+    return (
+        /^[ \t]*title\s+"/.test(text)                        ||  // title "..."
+        /^[ \t]*participant\s+"[^"]*"\s+as\s+/m.test(text)  ||  // participant "X" as Y
+        /^[ \t]*participant\s+\w+\s+as\s+/m.test(text)      ||  // participant X as Y
+        /^[ \t]*frame extend\s+-?[0-9]+/m.test(text)        ||  // frame extend N
+        /^[ \t]*end note\s*$/m.test(text)                   ||  // end note (block notes)
+        /^[ \t]*(?:opt|loop|break|alt|par|group|else|and|section)\s+"/m.test(text)  // quoted block labels
+    );
+}
+
+/**
+ * If the document uses old syntax and hasn't been offered a conversion yet,
+ * shows a one-time notification with a "Convert" button. Applying the edit
+ * replaces the full document content with the converted text.
+ */
+async function offerConversion(doc: vscode.TextDocument): Promise<void> {
+    const key = doc.uri.toString();
+    if (conversionOffered.has(key)) { return; }
+    const text = doc.getText();
+    if (!isOldSyntax(text)) { return; }
+
+    conversionOffered.add(key);
+
+    const choice = await vscode.window.showInformationMessage(
+        'This .seq file uses old syntax. Convert it to the current syntax?',
+        'Convert',
+        'Keep as-is'
+    );
+
+    if (choice !== 'Convert') { return; }
+
+    const converted = convertOldSyntax(text);
+    const edit = new vscode.WorkspaceEdit();
+    edit.replace(doc.uri, new vscode.Range(0, 0, doc.lineCount, 0), converted);
+    await vscode.workspace.applyEdit(edit);
+
+    // Save the document so the conversion is persisted to disk
+    await doc.save();
 }
 
 // ─── Security helpers ────────────────────────────────────────────────────────
