@@ -8,7 +8,7 @@
     "url": "https://github.com/ldaschinger/drawio-seqgen-vs-code-extension"
   },
   "description": "Generate draw.io diagrams from .seq files on save",
-  "version": "0.0.12",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.85.2"
   },

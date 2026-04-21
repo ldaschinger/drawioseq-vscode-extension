@@ -7,6 +7,8 @@
     { "include": "#comment" },
     { "include": "#block-keywords" },
     { "include": "#declaration-keywords" },
+    { "include": "#found-message" },
+    { "include": "#lost-message" },
     { "include": "#arrow-message" },
     { "include": "#self-call" },
     { "include": "#quoted-string" },
@@ -76,13 +78,6 @@
           }
         },
         {
-          "comment": "found / lost messages",
-          "match": "^\\s*(found|lost)\\b",
-          "captures": {
-            "1": { "name": "keyword.other.seq" }
-          }
-        },
-        {
           "comment": "vertical offset / extend frame",
           "match": "^\\s*(vertical offset|extend frame)\\s+(-?[0-9]+)$",
           "captures": {
@@ -91,6 +86,32 @@
           }
         }
       ]
+    },
+
+    "found-message": {
+      "comment": "found left/right [offset] -> ReceiverNAME [: label]",
+      "match": "^\\s*(found)\\s+(left|right)(\\s+[0-9]+)?\\s+(--?>?>?[+\\-|]?)\\s+([A-Za-z0-9_]+)(\\s*:\\s*(.+))?$",
+      "captures": {
+        "1": { "name": "keyword.other.seq" },
+        "2": { "name": "keyword.other.seq" },
+        "3": { "name": "constant.numeric.seq" },
+        "4": { "name": "keyword.operator.arrow.seq" },
+        "5": { "name": "entity.name.type.seq" },
+        "7": { "name": "string.unquoted.label.seq" }
+      }
+    },
+
+    "lost-message": {
+      "comment": "SenderNAME -> lost left/right [offset] [: label]",
+      "match": "^\\s*([A-Za-z0-9_]+)\\s+(--?>?>?[+\\-|]?)\\s+(lost)\\s+(left|right)(\\s+[0-9]+)?(\\s*:\\s*(.+))?$",
+      "captures": {
+        "1": { "name": "entity.name.type.seq" },
+        "2": { "name": "keyword.operator.arrow.seq" },
+        "3": { "name": "keyword.other.seq" },
+        "4": { "name": "keyword.other.seq" },
+        "5": { "name": "constant.numeric.seq" },
+        "7": { "name": "string.unquoted.label.seq" }
+      }
     },
 
     "arrow-message": {
